@@ -1,18 +1,244 @@
-Flask==3.0.3
-Flask-Login==0.6.3
-Flask-SQLAlchemy==3.1.1
-Werkzeug==3.0.4
-Jinja2==3.1.4
+# ===============================================
+# CONFIGURACIÓN COMPLETA DEL ENTORNO PYTHON
+# Sistema de Optimización de Rutas
+# ===============================================
 
-gpxpy==1.6.2
-networkx==3.4.2
-geopy==2.4.1
-folium==0.17.0
+# 1. Instalar pip-tools para manejo de dependencias
+echo "🔧 Instalando pip-tools..."
+pip install --upgrade pip pip-tools
 
-# Dependencias comunes de Flask
-itsdangerous==2.2.0
-click==8.1.7
-MarkupSafe==2.1.5
+# 2. Crear requirements.in con dependencias principales
+echo "📝 Creando requirements.in..."
+cat > requirements.in << EOF
+# === FRAMEWORK WEB ===
+Flask>=2.3.0
+Flask-SQLAlchemy>=3.0.0
+Flask-Login>=0.6.0
+Flask-WTF>=1.1.0
+Flask-Migrate>=4.0.0
 
-gunicorn==21.2.0
-Flask==2.3.3
+# === MAPAS Y GEOLOCALIZACIÓN ===
+folium>=0.14.0
+geopy>=2.3.0
+requests>=2.31.0
+
+# === BASE DE DATOS ===
+SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.0  # PostgreSQL
+# sqlite3 viene incluido con Python
+
+# === OPTIMIZACIÓN DE RUTAS ===
+networkx>=3.1
+scipy>=1.10.0
+numpy>=1.24.0
+
+# === UTILIDADES ===
+python-dotenv>=1.0.0
+Werkzeug>=2.3.0
+Jinja2>=3.1.0
+itsdangerous>=2.1.0
+click>=8.1.0
+
+# === DESARROLLO (opcional) ===
+# flask-debugtoolbar>=0.13.0
+# pytest>=7.4.0
+# black>=23.0.0
+EOF
+
+# 3. Crear requirements-dev.in para desarrollo
+echo "🛠️ Creando requirements-dev.in..."
+cat > requirements-dev.in << EOF
+-r requirements.in
+
+# === HERRAMIENTAS DE DESARROLLO ===
+flask-debugtoolbar>=0.13.0
+pytest>=7.4.0
+pytest-flask>=1.2.0
+black>=23.0.0
+flake8>=6.0.0
+isort>=5.12.0
+
+# === DOCUMENTACIÓN ===
+sphinx>=7.0.0
+sphinx-rtd-theme>=1.3.0
+EOF
+
+# 4. Generar archivos de requirements con versiones exactas
+echo "⚙️ Compilando requirements..."
+pip-compile requirements.in --output-file requirements.txt --resolver=backtracking
+pip-compile requirements-dev.in --output-file requirements-dev.txt --resolver=backtracking
+
+# 5. Crear archivo de entorno
+echo "🌍 Creando archivo .env de ejemplo..."
+cat > .env.example << EOF
+# === CONFIGURACIÓN DE LA APLICACIÓN ===
+FLASK_APP=app.py
+FLASK_ENV=development
+FLASK_DEBUG=True
+SECRET_KEY=tu_clave_secreta_muy_segura_aqui
+
+# === BASE DE DATOS ===
+DATABASE_URL=sqlite:///rutas.db
+# Para PostgreSQL: postgresql://user:password@localhost/nombre_db
+
+# === CONFIGURACIÓN DE MAPAS ===
+DEFAULT_LAT=-3.7327
+DEFAULT_LNG=-79.2071
+DEFAULT_ZOOM=13
+MAPBOX_TOKEN=tu_token_de_mapbox_aqui
+
+# === CONFIGURACIÓN DE EMAIL (opcional) ===
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=True
+MAIL_USERNAME=tu_email@gmail.com
+MAIL_PASSWORD=tu_password_de_app
+
+# === OTRAS CONFIGURACIONES ===
+MAX_CONTENT_LENGTH=16777216  # 16MB
+UPLOAD_FOLDER=uploads
+ALLOWED_EXTENSIONS=csv,xlsx,xls
+EOF
+
+# 6. Crear script de instalación
+echo "📦 Creando script de instalación..."
+cat > install.sh << EOF
+#!/bin/bash
+echo "🚀 Instalando Sistema de Optimización de Rutas..."
+
+# Verificar Python
+python --version || { echo "❌ Python no encontrado. Instala Python 3.8+"; exit 1; }
+
+# Crear entorno virtual
+echo "📁 Creando entorno virtual..."
+python -m venv venv
+
+# Activar entorno virtual
+echo "🔄 Activando entorno virtual..."
+source venv/bin/activate || venv\\Scripts\\activate
+
+# Instalar dependencias
+echo "📦 Instalando dependencias..."
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Copiar archivo de configuración
+if [ ! -f .env ]; then
+    cp .env.example .env
+    echo "📝 Archivo .env creado. ¡No olvides configurarlo!"
+fi
+
+# Crear directorios necesarios
+mkdir -p uploads
+mkdir -p instance
+mkdir -p logs
+
+echo "✅ ¡Instalación completada!"
+echo "📋 Próximos pasos:"
+echo "   1. Edita el archivo .env con tu configuración"
+echo "   2. Ejecuta: flask db init"
+echo "   3. Ejecuta: flask db migrate -m 'Initial migration'"
+echo "   4. Ejecuta: flask db upgrade"
+echo "   5. Ejecuta: flask run"
+EOF
+
+chmod +x install.sh
+
+# 7. Crear Dockerfile para contenedorización
+echo "🐳 Creando Dockerfile..."
+cat > Dockerfile << EOF
+FROM python:3.11-slim
+
+# Establecer directorio de trabajo
+WORKDIR /app
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    g++ \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar archivos de requirements
+COPY requirements.txt .
+
+# Instalar dependencias Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código de la aplicación
+COPY . .
+
+# Crear usuario no-root
+RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
+USER appuser
+
+# Exponer puerto
+EXPOSE 5000
+
+# Variables de entorno
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
+
+# Comando por defecto
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+EOF
+
+# 8. Crear docker-compose.yml
+echo "🐳 Creando docker-compose.yml..."
+cat > docker-compose.yml << EOF
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/rutas_db
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: rutas_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+EOF
+
+# 9. Instalar dependencias principales
+echo "🔄 Instalando dependencias principales..."
+pip install -r requirements.txt
+
+# 10. Verificar instalación
+echo "✅ Verificando instalación..."
+python -c "import flask; print(f'✅ Flask {flask.__version__} instalado correctamente')"
+python -c "import folium; print(f'✅ Folium {folium.__version__} instalado correctamente')"
+python -c "import sqlalchemy; print(f'✅ SQLAlchemy {sqlalchemy.__version__} instalado correctamente')"
+
+echo ""
+echo "🎉 ¡CONFIGURACIÓN COMPLETADA!"
+echo "=============================================="
+echo "📁 Archivos creados:"
+echo "   - requirements.in (dependencias principales)"
+echo "   - requirements.txt (versiones exactas)"
+echo "   - requirements-dev.in (dependencias de desarrollo)"
+echo "   - requirements-dev.txt (versiones exactas dev)"
+echo "   - .env.example (configuración de ejemplo)"
+echo "   - install.sh (script de instalación)"
+echo "   - Dockerfile (contenedorización)"
+echo "   - docker-compose.yml (orquestación)"
+echo ""
+echo "🚀 Para comenzar:"
+echo "   1. Copia .env.example a .env y configúralo"
+echo "   2. Ejecuta: chmod +x install.sh && ./install.sh"
+echo "   3. O usa Docker: docker-compose up --build"
+echo "=============================================="
