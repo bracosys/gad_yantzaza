@@ -5,8 +5,10 @@ Flask-Login==0.6.3
 Flask-WTF==1.2.1
 WTForms==3.1.0
 
+sqlalchemy==2.0.0
+typing-extensions==4.8.0
 # Base de datos
-SQLAlchemy==2.0.23
+
 
 # Utilidades
 Werkzeug==3.0.1
